@@ -467,3 +467,33 @@ async def startScraper() -> ProcessedProductDetails:
 
     Logger.info('Ending the Scraper')
     return filtered_products
+
+async def startPriceCheckScraper() -> list[Promotion]:
+    Logger.info('Starting the Price Check Scraper')
+    start_time = time.time()
+
+    await connect_to_database()
+
+    try:
+        await setup_amazon_uk()
+        await sleep_randomly(DELAY_BETWEEN_STEPS)
+
+        product_links = await scraping_promo_products_from_searches()
+        await sleep_randomly(DELAY_BETWEEN_STEPS)
+
+        promo_codes = await scrape_promo_codes_from_urls_in_batch(product_links)
+        await sleep_randomly(DELAY_BETWEEN_STEPS)
+
+        latest_promotions = await scrape_links_from_promo_codes(promo_codes)
+
+    except Exception as e:
+        Logger.critical("FAILED!! FAILED!! FAILED!!", e)
+        latest_promotions = []
+
+    end_time = time.time()
+    hours, remainder = divmod(end_time - start_time, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    Logger.info(f"Scraper finished execution in {int(hours)}h {int(minutes)}m {int(seconds)}s")
+    Logger.info('Ending the Scraper')
+
+    return latest_promotions

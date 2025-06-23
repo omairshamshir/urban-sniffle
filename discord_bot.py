@@ -12,7 +12,7 @@ from db import add_search, remove_search, get_all_searches
 
 from logger import Logger
 from models import ProductDetails, ProcessedProductDetails,Promotion
-from scraper import startScraper
+from scraper import startScraper,startPriceCheckScraper
 from utils import get_current_time
 
 data_manager = DataManager()
@@ -75,26 +75,30 @@ async def send_promo_notification_to_discord(channel, processed_data: ProcessedP
 
 async def send_price_change_notification(promotion: Promotion, old_price: str):
     Logger.info(f'Sending price change notification for {promotion.product_title} to Discord')
-    channel_ids = data_manager.get_notification_channels()
-    for channel_id in channel_ids:
+
+    price_alert_channel = None
+    for channel_id in data_manager.get_notification_channels():
         channel = client.get_channel(channel_id)
         if channel and "price-alert" in channel.name.lower():
-            print(f"Checking channel: {channel.name}")
-            embed = discord.Embed(
-                title=f"Price Change Detected: {promotion.product_title}",
-                url=promotion.product_url,
-                color=discord.Color.orange()
-            )
-            embed.add_field(name="Old Price", value=old_price or "N/A", inline=True)
-            embed.add_field(name="New Price", value=promotion.product_price or "N/A", inline=True)
-            embed.add_field(name="Promotion", value=promotion.promotion_title, inline=False)
-            embed.set_thumbnail(url=promotion.product_img)
+            Logger.info(f"Found price alert channel: {channel.name}")
+            price_alert_channel = channel
+            break 
 
-            await channel.send(embed=embed)
-        else:
-            
-            print(f"Channel not found: {channel.name if channel else 'None'} (ID: {channel_id})")
+    if price_alert_channel:
+        Logger.info(f"Sending latest Price Alert to : {price_alert_channel.name}")
+        embed = discord.Embed(
+            title=f"Price Change Detected: {promotion.product_title}",
+            url=promotion.product_url,
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Old Price", value=old_price or "N/A", inline=True)
+        embed.add_field(name="New Price", value=promotion.product_price or "N/A", inline=True)
+        embed.add_field(name="Promotion", value=promotion.promotion_title, inline=False)
+        embed.set_thumbnail(url=promotion.product_img)
 
+        await price_alert_channel.send(embed=embed)
+    else:
+        Logger.warn("No 'price-alert' channel found in the channel list.")
 
 async def on_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     Logger.critical(f"Command error occurred", error)
@@ -280,3 +284,25 @@ async def run_amazon_cron():
         Logger.info("Daily Amazon promotion check completed.")
     except Exception as e:
         Logger.critical("An error occurred in daily Amazon promotion check", e)
+        
+@client.tree.command(name="ap_check_price_change", description="Manually run the Amazon promotion scraper to check for price changes")
+@app_commands.checks.has_permissions(administrator=True)
+async def run_scraper(interaction: discord.Interaction):
+    Logger.info("Manual scraper run initiated for price change check")
+    embed = discord.Embed(
+        title="Manually Triggered Bot",
+        color=discord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed)
+    await run_amazon_cron()
+
+
+async def run_amazon_cron():
+    try:
+        Logger.info("Starting daily Amazon promotion check")
+
+        await startPriceCheckScraper()
+
+        Logger.info("Amazon Product Price Change check completed.")
+    except Exception as e:
+        Logger.critical("An error occurred in Amazon Product Price Change check", e)
