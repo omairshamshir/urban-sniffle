@@ -57,6 +57,9 @@ All commands are prefixed with `ap_` (Amazon Promotions).
 ## Price Alert Channel
 If you want to receive notifications for product price changes, create a Discord channel with "price-alert" in its name (for example, `promo-scraper-price-alert`). The bot will automatically send price change alerts to any channel matching this naming pattern.
 
+### Price Alert Management
+- `/ap_check_price_change`: Run this Command to check for price changes on products in the `price-alert` channel.
+
 ## Scheduled Tasks
 
 The bot runs a scheduled task every 6 hours to check for new promotions and send notifications to all registered
